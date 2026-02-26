@@ -113,6 +113,66 @@ def _safe_hex_color(value: str | None, fallback: str) -> str:
     return fallback
 
 
+def _render_mixed_text(story, text: str, normal_font: str, symbol_font: str, style):
+    """Render text with mixed Chinese and symbols using appropriate fonts."""
+    # Box drawing and arrow characters need symbol font
+    special_chars = set('┌┐└┘├┤┬┴─│┏┓┗┛┣┫┳┻━┃╔╗╚╝╠╣╦╩═║▲▼◄►←→↑↓')
+    
+    # If no special chars, use normal rendering
+    if not any(c in special_chars for c in text):
+        safe = (
+            text.replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace(" ", "&nbsp;")
+        )
+        story.append(Paragraph(safe or "&nbsp;", style))
+        return
+    
+    # Build fragments with font switching
+    fragments = []
+    current_is_special = None
+    current_text = []
+    
+    for char in text:
+        is_special = char in special_chars
+        
+        if current_is_special is None:
+            current_is_special = is_special
+            current_text.append(char)
+        elif is_special == current_is_special:
+            current_text.append(char)
+        else:
+            # Font switch needed
+            font = symbol_font if current_is_special else normal_font
+            fragment_text = ''.join(current_text)
+            fragment_text = (
+                fragment_text.replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace(" ", "&nbsp;")
+            )
+            if fragment_text:
+                fragments.append(f'<font name="{font}">{fragment_text}</font>')
+            current_is_special = is_special
+            current_text = [char]
+    
+    # Flush remaining
+    if current_text:
+        font = symbol_font if current_is_special else normal_font
+        fragment_text = ''.join(current_text)
+        fragment_text = (
+            fragment_text.replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace(" ", "&nbsp;")
+        )
+        if fragment_text:
+            fragments.append(f'<font name="{font}">{fragment_text}</font>')
+    
+    html = ''.join(fragments)
+    story.append(Paragraph(html, style))
+    
 def _markdown_to_plain(text: str) -> str:
     """Strip markdown syntax, return plain text. No HTML tags to avoid font issues."""
     # Remove bold markers
@@ -177,7 +237,7 @@ def _is_flowchart_line(line: str) -> bool:
     return box_count >= 2  # At least 2 box chars
 
 
-def _render_markdown(story, markdown_text: str, h_style, h3_style, body_style, quote_style, code_style, mono_style, table_style, mono_box_style):
+def _render_markdown(story, markdown_text: str, h_style, h3_style, body_style, quote_style, code_style, mono_style, table_style, mono_box_style, font_normal: str, font_symbol: str):
     """Render markdown text into reportlab story with full formatting support."""
     if not markdown_text.strip():
         return
@@ -194,15 +254,9 @@ def _render_markdown(story, markdown_text: str, h_style, h3_style, body_style, q
         if flowchart_buffer:
             # Add spacing
             story.append(Spacer(1, 4))
-            # Render flowchart with monospace
+            # Render flowchart with mixed font support
             for fline in flowchart_buffer:
-                safe = (
-                    fline.replace("&", "&amp;")
-                    .replace("<", "&lt;")
-                    .replace(">", "&gt;")
-                    .replace(" ", "&nbsp;")
-                )
-                story.append(Paragraph(safe or "&nbsp;", mono_style))
+                _render_mixed_text(story, fline, font_normal, font_symbol, mono_style)
             story.append(Spacer(1, 4))
             flowchart_buffer = []
     
@@ -411,7 +465,7 @@ def _write_pdf(out_path: Path, payload: dict) -> None:
     mono_style = ParagraphStyle(
         "MonoStyle",
         parent=styles["BodyText"],
-        fontName=font_symbol,  # Use symbol font for flowcharts (Unicode box drawing chars)
+        fontName=font_normal,  # Use normal Chinese font for flowcharts
         fontSize=9,
         leading=11,
         textColor=colors.HexColor("#374151"),
@@ -477,7 +531,7 @@ def _write_pdf(out_path: Path, payload: dict) -> None:
 
     content_markdown = (payload.get("contentMarkdown") or "").strip()
     if content_markdown:
-        _render_markdown(story, content_markdown, h_style, h3_style, body_style, quote_style, code_style, mono_style, table_style, None)
+        _render_markdown(story, content_markdown, h_style, h3_style, body_style, quote_style, code_style, mono_style, table_style, None, font_normal, font_symbol)
 
     for sec in payload.get("sections", []) or []:
         story.append(Paragraph(sec.get("heading", ""), h_style))
