@@ -166,4 +166,5 @@ When applicable, describe a decision or process flow using a text-based flowchar
 ## Output
 
 - **Default save location**: `~/Desktop/Notebook/{topic}.pdf`
-- **JSON cleanup**: Intermediate JSON file auto-deleted after generation
+- **JSON cleanup**: The result.json intermediate file is auto-deleted after PDF generation
+- **Screenshot cleanup**: Screenshot file is auto-deleted after being embedded in PDF

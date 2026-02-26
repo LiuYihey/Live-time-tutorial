@@ -419,8 +419,9 @@ class QuizWindow:
         self.note_status.config(text="Ready to save screenshot")
 
     def _on_close(self):
-        """Handle window close: save result and destroy."""
-        self._save_quiz_result()
+        """Handle window close: always save quiz result if user answered."""
+        if self.answered and self.selected_index is not None:
+            self._save_quiz_result()
         self.root.destroy()
 
     def _save_quiz_result(self):
@@ -434,6 +435,7 @@ class QuizWindow:
                 result = {
                     "quizId": self.quiz_data.get("id"),
                     "question": self.quiz_data.get("question"),
+                    "options": self.quiz_data.get("options", []),
                     "selectedIndex": selected,
                     "selectedAnswer": self.quiz_data.get("options", [])[selected] if selected is not None and selected >= 0 else None,
                     "correctIndex": correct,

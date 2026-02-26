@@ -4,7 +4,7 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
-import { writeFileSync, mkdirSync, existsSync, readFileSync } from "fs";
+import { writeFileSync, mkdirSync, existsSync, readFileSync, unlinkSync } from "fs";
 import { join, resolve, dirname } from "path";
 import { homedir } from "os";
 import { spawn } from "child_process";
@@ -217,10 +217,20 @@ class QuizMCPServer {
     writeFileSync(quizDataPath, JSON.stringify(quiz, null, 2), "utf-8");
 
     // Launch GUI and wait for window to close
-    const quizResultPath = join(notebookDir, `${filename}.result.json`);
+    const resultFilename = filename.replace('.json', '.result.json');
+    const quizResultPath = join(notebookDir, resultFilename);
     await this.launchPythonGuiAndWait(quizDataPath);
 
-    // Read result file written on window close
+    // Clean up: delete the quiz input file (it's temporary)
+    try {
+      if (existsSync(quizDataPath)) {
+        unlinkSync(quizDataPath);
+      }
+    } catch {
+      // Ignore cleanup errors
+    }
+
+    // Read result file - exists if user answered (and optionally saved to notebook)
     if (existsSync(quizResultPath)) {
       try {
         const resultData = JSON.parse(readFileSync(quizResultPath, "utf-8"));
@@ -273,7 +283,7 @@ ${systemPrompt}`,
 Category: ${quiz.category}
 Question: ${quiz.question.substring(0, 70)}${quiz.question.length > 70 ? "..." : ""}
 
-The user closed the quiz window. No answer was recorded.`,
+The user closed the quiz window without answering. Do NOT generate another quiz. Simply ask if they need help with anything else.`,
         },
       ],
     };
