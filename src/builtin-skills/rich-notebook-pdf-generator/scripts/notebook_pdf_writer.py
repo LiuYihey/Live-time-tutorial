@@ -77,10 +77,9 @@ def _register_chinese_fonts():
     # Register symbol font for Unicode characters (arrows, box drawing, etc.)
     symbol_font_name = normal_font_name  # fallback
     symbol_font_options = [
-        ("SegoeUISymbol", "segoeuisymbol.ttf"),  # Windows 专用符号字体，支持完整 Unicode 符号
-        ("ArialUnicodeMS", "ARIALUNI.ttf"),  # Arial Unicode MS - 最完整的 Unicode 支持
+        ("SegoeUISymbol", "seguisym.ttf"),  # Segoe UI Symbol - Windows 内置，完整 Unicode 符号支持
+        ("ArialUnicodeMS", "ARIALUNI.TTF"),  # Arial Unicode MS
         ("SegoeUI", "segoeui.ttf"),  # Windows 10/11 现代字体
-        ("DejaVuSans", "DejaVuSans.ttf"),  # DejaVu Sans
         ("LucidaSansUnicode", "l_10646.ttf"),  # Lucida Sans Unicode
     ]
     
@@ -114,74 +113,109 @@ def _safe_hex_color(value: str | None, fallback: str) -> str:
     return fallback
 
 
-def _render_mixed_text(story, text: str, normal_font: str, symbol_font: str, style):
-    """Render text with mixed Chinese and symbols using appropriate fonts."""
-    # Box drawing and arrow characters need symbol font
-    # 包含：框线字符、三角形箭头、实心箭头、双线箭头、其他常用箭头
-    special_chars = set('┌┐└┘├┤┬┴─│┏┓┗┛┣┫┳┻━┃╔╗╚╝╠╣╦╩═║▲▼◄►←→↑↓↔↕↖↗↘↙⇐⇒⇑⇓⇔⇕⇧⇩➜➝➞➟➠➡➢➣➤➥➦➧➨➩➪➫➬➭➮➯➱➲➳➴➵➶➷➸➹➺➻➼➽➾➿')
-    
-    # If no special chars, use normal rendering
-    if not any(c in special_chars for c in text):
-        safe = (
-            text.replace("&", "&amp;")
-            .replace("<", "&lt;")
-            .replace(">", "&gt;")
-            .replace(" ", "&nbsp;")
-        )
-        story.append(Paragraph(safe or "&nbsp;", style))
-        return
-    
-    # Build fragments with font switching
+# Unicode ranges that need symbol font rendering
+_SYMBOL_RANGES = [
+    (0x2190, 0x21FF),  # Arrows
+    (0x2500, 0x257F),  # Box Drawing
+    (0x2580, 0x259F),  # Block Elements
+    (0x25A0, 0x25FF),  # Geometric Shapes (▲▼◄► etc.)
+    (0x2600, 0x26FF),  # Miscellaneous Symbols
+    (0x2700, 0x27BF),  # Dingbats (➜➡➤ etc.)
+    (0x27F0, 0x27FF),  # Supplemental Arrows-A
+    (0x2900, 0x297F),  # Supplemental Arrows-B
+    (0x2B00, 0x2BFF),  # Misc Symbols and Arrows
+]
+
+
+def _is_symbol_char(ch: str) -> bool:
+    """Check if a character needs the symbol font (box drawing, arrows, etc.)."""
+    cp = ord(ch)
+    for lo, hi in _SYMBOL_RANGES:
+        if lo <= cp <= hi:
+            return True
+    return False
+
+
+def _normalize_content(text: str) -> str:
+    """Normalize content: convert literal \\n sequences to real newlines."""
+    # Replace literal two-char sequences '\n' with real newline
+    text = text.replace('\\n', '\n')
+    return text
+
+
+def _escape_html(text: str) -> str:
+    """Escape text for use inside reportlab Paragraph XML."""
+    return (
+        text.replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+    )
+
+
+def _escape_html_preserve_space(text: str) -> str:
+    """Escape text and convert spaces to &nbsp; for monospace rendering."""
+    return _escape_html(text).replace(" ", "&nbsp;")
+
+
+def _render_mixed_line(text: str, normal_font: str, symbol_font: str, preserve_space: bool = False) -> str:
+    """Build XML string with font switching for mixed Chinese/symbol text."""
+    escape_fn = _escape_html_preserve_space if preserve_space else _escape_html
+
+    has_symbol = any(_is_symbol_char(c) for c in text)
+    if not has_symbol:
+        return escape_fn(text) or "&nbsp;"
+
     fragments = []
-    current_is_special = None
-    current_text = []
+    current_is_symbol = None
+    buf = []
+
+    def flush():
+        nonlocal buf, current_is_symbol
+        if not buf:
+            return
+        chunk = ''.join(buf)
+        escaped = escape_fn(chunk)
+        if escaped:
+            font = symbol_font if current_is_symbol else normal_font
+            fragments.append(f'<font name="{font}">{escaped}</font>')
+        buf = []
+
+    for ch in text:
+        is_sym = _is_symbol_char(ch)
+        if current_is_symbol is None:
+            current_is_symbol = is_sym
+        elif is_sym != current_is_symbol:
+            flush()
+            current_is_symbol = is_sym
+        buf.append(ch)
+    flush()
+    return ''.join(fragments) or "&nbsp;"
     
-    for char in text:
-        is_special = char in special_chars
-        
-        if current_is_special is None:
-            current_is_special = is_special
-            current_text.append(char)
-        elif is_special == current_is_special:
-            current_text.append(char)
-        else:
-            # Font switch needed
-            font = symbol_font if current_is_special else normal_font
-            fragment_text = ''.join(current_text)
-            fragment_text = (
-                fragment_text.replace("&", "&amp;")
-                .replace("<", "&lt;")
-                .replace(">", "&gt;")
-                .replace(" ", "&nbsp;")
-            )
-            if fragment_text:
-                fragments.append(f'<font name="{font}">{fragment_text}</font>')
-            current_is_special = is_special
-            current_text = [char]
-    
-    # Flush remaining
-    if current_text:
-        font = symbol_font if current_is_special else normal_font
-        fragment_text = ''.join(current_text)
-        fragment_text = (
-            fragment_text.replace("&", "&amp;")
-            .replace("<", "&lt;")
-            .replace(">", "&gt;")
-            .replace(" ", "&nbsp;")
-        )
-        if fragment_text:
-            fragments.append(f'<font name="{font}">{fragment_text}</font>')
-    
-    html = ''.join(fragments)
-    story.append(Paragraph(html, style))
-    
+def _md_to_xml(text: str, normal_font: str, symbol_font: str) -> str:
+    """Convert inline markdown to reportlab XML with proper font handling."""
+    # Bold
+    def _bold_repl(m):
+        inner = _render_mixed_line(m.group(1), normal_font, symbol_font)
+        return f'<b>{inner}</b>'
+    text = re.sub(r'\*\*(.+?)\*\*', _bold_repl, text)
+    # Italic
+    def _italic_repl(m):
+        inner = _render_mixed_line(m.group(1), normal_font, symbol_font)
+        return f'<i>{inner}</i>'
+    text = re.sub(r'(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)', _italic_repl, text)
+    # Inline code
+    def _code_repl(m):
+        return _escape_html(m.group(1))
+    text = re.sub(r'`([^`]+)`', _code_repl, text)
+    # Remaining plain text segments need symbol font handling
+    # We process what's left that isn't already in XML tags
+    return text
+
+
 def _markdown_to_plain(text: str) -> str:
     """Strip markdown syntax, return plain text. No HTML tags to avoid font issues."""
-    # Remove bold markers
     text = re.sub(r'\*\*(.+?)\*\*', r'\1', text)
-    # Remove italic markers  
     text = re.sub(r'\*(.+?)\*', r'\1', text)
-    # Remove inline code markers
     text = re.sub(r'`([^`]+)`', r'\1', text)
     return text
 
@@ -225,46 +259,46 @@ def _parse_table(lines: list, start_idx: int) -> tuple:
 
 
 def _is_flowchart_line(line: str) -> bool:
-    """Check if line is part of a flowchart using box-drawing characters."""
+    """Check if line is part of a flowchart using box-drawing / arrow characters."""
     stripped = line.strip()
     if not stripped:
         return False
-    # Must contain box drawing characters or arrows
-    box_chars = set('┌┐└┘├┤┬┴─│┏┓┗┛┣┫┳┻━┃╔╗╚╝╠╣╦╩═║')
-    arrow_chars = set('▲▼◄►←→↑↓↔↕↖↗↘↙⇐⇒⇑⇓⇔⇕⇧⇩➜➝➞➟➠➡➢➣➤➥➦➧➨➩➪➫➬➭➮➯➱➲➳➴➵➶➷➸➹➺➻➼➽➾➿')
-    special_chars = box_chars | arrow_chars
-    
-    has_special = any(c in special_chars for c in stripped)
-    if not has_special:
-        return False
-    # Count special chars vs total chars - should be significant portion
-    special_count = sum(1 for c in stripped if c in special_chars)
-    return special_count >= 1  # At least 1 special char
+    sym_count = sum(1 for c in stripped if _is_symbol_char(c))
+    return sym_count >= 2
 
 
 def _render_markdown(story, markdown_text: str, h_style, h3_style, body_style, quote_style, code_style, mono_style, table_style, mono_box_style, font_normal: str, font_symbol: str):
     """Render markdown text into reportlab story with full formatting support."""
+    # Normalize literal \n sequences to real newlines
+    markdown_text = _normalize_content(markdown_text)
+
     if not markdown_text.strip():
         return
 
     fence = chr(96) * 3
     in_code = False
-    in_flowchart = False
     flowchart_buffer = []
     lines = markdown_text.splitlines()
     i = 0
-    
+
+    def _make_body(text):
+        """Convert markdown inline formatting to XML for body paragraphs."""
+        return _md_to_xml(text, font_normal, font_symbol)
+
+    def _make_mixed(text):
+        """Render text with mixed font support preserving spaces."""
+        return _render_mixed_line(text, font_normal, font_symbol, preserve_space=True)
+
     def _flush_flowchart():
         nonlocal flowchart_buffer
         if flowchart_buffer:
-            # Add spacing
             story.append(Spacer(1, 4))
-            # Render flowchart with mixed font support
             for fline in flowchart_buffer:
-                _render_mixed_text(story, fline, font_normal, font_symbol, mono_style)
+                xml = _make_mixed(fline)
+                story.append(Paragraph(xml or "&nbsp;", mono_style))
             story.append(Spacer(1, 4))
             flowchart_buffer = []
-    
+
     while i < len(lines):
         raw = lines[i]
         line = raw.rstrip("\n")
@@ -279,12 +313,7 @@ def _render_markdown(story, markdown_text: str, h_style, h3_style, body_style, q
 
         if in_code:
             _flush_flowchart()
-            safe = (
-                line.replace("&", "&amp;")
-                .replace("<", "&lt;")
-                .replace(">", "&gt;")
-                .replace(" ", "&nbsp;")
-            )
+            safe = _escape_html_preserve_space(line)
             story.append(Paragraph(safe or "&nbsp;", code_style))
             i += 1
             continue
@@ -297,38 +326,30 @@ def _render_markdown(story, markdown_text: str, h_style, h3_style, body_style, q
             continue
 
         # Check if this is a flowchart line
-        is_flow = _is_flowchart_line(line)
-        if is_flow:
+        if _is_flowchart_line(line):
             flowchart_buffer.append(line)
             i += 1
             continue
         elif flowchart_buffer:
-            # We were in a flowchart but this line is not
             _flush_flowchart()
 
         # Headings
         if stripped.startswith("### "):
-            html_text = _markdown_to_plain(stripped[4:])
-            story.append(Paragraph(html_text, h3_style))
+            story.append(Paragraph(_make_body(stripped[4:]), h3_style))
             i += 1
             continue
-
         if stripped.startswith("## "):
-            html_text = _markdown_to_plain(stripped[3:])
-            story.append(Paragraph(html_text, h_style))
+            story.append(Paragraph(_make_body(stripped[3:]), h_style))
             i += 1
             continue
-
         if stripped.startswith("# "):
-            html_text = _markdown_to_plain(stripped[2:])
-            story.append(Paragraph(html_text, h_style))
+            story.append(Paragraph(_make_body(stripped[2:]), h_style))
             i += 1
             continue
 
         # Quote
         if stripped.startswith("> "):
-            html_text = _markdown_to_plain(stripped[2:])
-            story.append(Paragraph(html_text, quote_style))
+            story.append(Paragraph(_make_body(stripped[2:]), quote_style))
             i += 1
             continue
 
@@ -344,32 +365,26 @@ def _render_markdown(story, markdown_text: str, h_style, h3_style, body_style, q
                 i = next_idx
                 continue
 
-        # List items - convert checkboxes to numbered checklist
+        # List items
         if stripped.startswith("- ") or stripped.startswith("* "):
             content = stripped[2:]
-            # Convert any checkbox to number (will be handled by tracking index)
             if content.startswith("[ ] ") or content.startswith("[x] ") or content.startswith("[X] "):
                 content = content[4:]
-            prefix = ""  # Just use the content, numbering handled separately if needed
-            plain_text = _markdown_to_plain(content)
-            story.append(Paragraph(plain_text, body_style))
+            story.append(Paragraph(_make_body(content), body_style))
             i += 1
             continue
 
         # Ordered list
-        ordered = re.match(r"^(\d+)[\.)]\s+(.*)$", stripped)
+        ordered = re.match(r"^(\d+)[.\)]\s+(.*)$", stripped)
         if ordered:
-            html_text = _markdown_to_plain(stripped)
-            story.append(Paragraph(html_text, body_style))
+            story.append(Paragraph(_make_body(stripped), body_style))
             i += 1
             continue
 
-        # Regular paragraph with markdown formatting
-        html_text = _markdown_to_plain(stripped)
-        story.append(Paragraph(html_text, body_style))
+        # Regular paragraph
+        story.append(Paragraph(_make_body(stripped), body_style))
         i += 1
-    
-    # Flush any remaining flowchart
+
     _flush_flowchart()
 
 

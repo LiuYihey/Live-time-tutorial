@@ -123,14 +123,14 @@ class QuizWindow:
         self.root.title(f"Live-time-tutorial - {quiz_data.get('category', 'Quiz')}")
         self.root.configure(bg="#0A1220")
 
-        # Size window aggressively so full quiz is visible without manual fullscreen.
+        # Size window near-fullscreen so quiz is fully visible on first pop-up.
         self.root.update_idletasks()
         sw = self.root.winfo_screenwidth()
         sh = self.root.winfo_screenheight()
-        width = min(int(sw * 0.94), 1680)
-        height = min(int(sh * 0.93), 1020)
+        width = min(int(sw * 0.98), 2400)
+        height = min(int(sh * 0.96), 1400)
         x = (sw - width) // 2
-        y = (sh - height) // 2
+        y = max(0, (sh - height) // 2 - 10)
         self.root.geometry(f'{width}x{height}+{x}+{y}')
         self.root.minsize(960, 680)
         
@@ -200,13 +200,14 @@ class QuizWindow:
         # ── Left column: Question + Options (fills vertically) ──
         left = ttk.Frame(content, style="Card.TFrame", padding=14)
         left.grid(row=0, column=0, sticky="nsew", padx=(0, 6))
-        left.rowconfigure(2, weight=1)  # options area expands
+        left.rowconfigure(1, weight=1)   # question area gets some stretch
+        left.rowconfigure(2, weight=3)   # options area gets more stretch
 
         ttk.Label(left, text="Question", style="H2.TLabel").grid(row=0, column=0, sticky="w")
 
         self.question_text = tk.Text(
             left,
-            height=3,
+            height=4,
             wrap=tk.WORD,
             font=("Segoe UI", 11),
             bg="#0A1220",
@@ -220,7 +221,7 @@ class QuizWindow:
         )
         self.question_text.insert("1.0", self.quiz_data.get("question", ""))
         self.question_text.config(state=tk.DISABLED)
-        self.question_text.grid(row=1, column=0, sticky="ew", pady=(6, 10))
+        self.question_text.grid(row=1, column=0, sticky="nsew", pady=(6, 10))
 
         left.columnconfigure(0, weight=1)
 
@@ -362,8 +363,8 @@ class QuizWindow:
         hint_height = self.hint_label.winfo_reqheight() + 8
         free_height = max(0, available_height - base_rows_height - hint_height)
 
-        gap = max(4, min(28, free_height // (count + 2)))
-        inner_y_pad = max(8, min(16, 8 + gap // 3))
+        gap = max(4, min(48, free_height // (count + 1)))
+        inner_y_pad = max(8, min(24, 8 + gap // 2))
         wrap_length = max(260, available_width - 120)
 
         for i, cfg in enumerate(self.option_rows):
