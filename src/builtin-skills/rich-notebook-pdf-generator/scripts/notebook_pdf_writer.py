@@ -286,61 +286,182 @@ def _parse_table(lines: list, start_idx: int) -> tuple:
 import unicodedata
 
 
-class _FlowchartBlock(Flowable):
-    """Render a block of text-art flowchart lines using canvas drawing
-    with a uniform character-cell grid so that box-drawing characters
-    and CJK text align perfectly."""
+# Box-drawing character to line type mapping
+_BOX_CHARS = {
+    # Horizontal lines
+    '─': 'h', '━': 'h', '┈': 'h', '┉': 'h', '═': 'h',
+    # Vertical lines  
+    '│': 'v', '┃': 'v', '┊': 'v', '┋': 'v', '║': 'v',
+    # Corners
+    '┌': 'tl', '┍': 'tl', '┎': 'tl', '┏': 'tl',  # top-left
+    '┐': 'tr', '┑': 'tr', '┒': 'tr', '┓': 'tr',  # top-right
+    '└': 'bl', '┕': 'bl', '┖': 'bl', '┗': 'bl',  # bottom-left
+    '┘': 'br', '┙': 'br', '┚': 'br', '┛': 'br',  # bottom-right
+    # T-junctions
+    '├': 'tr', '┝': 'tr', '┞': 'tr', '┟': 'tr', '┠': 'tr', '┡': 'tr', '┢': 'tr', '┣': 'tr',  # left-T
+    '┤': 'lt', '┥': 'lt', '┦': 'lt', '┧': 'lt', '┨': 'lt', '┩': 'lt', '┪': 'lt', '┫': 'lt',  # right-T
+    '┬': 'tb', '┭': 'tb', '┮': 'tb', '┯': 'tb', '┰': 'tb', '┱': 'tb', '┲': 'tb', '┳': 'tb',  # top-T
+    '┴': 'lt', '┵': 'lt', '┶': 'lt', '┷': 'lt', '┸': 'lt', '┹': 'lt', '┺': 'lt', '┻': 'lt',  # bottom-T
+    # Crosses
+    '┼': 'c', '┽': 'c', '┾': 'c', '┿': 'c', '╀': 'c', '╁': 'c', '╂': 'c', '╃': 'c',
+    '╄': 'c', '╅': 'c', '╆': 'c', '╇': 'c', '╈': 'c', '╉': 'c', '╊': 'c', '╋': 'c',
+    '╪': 'c', '╫': 'c', '╬': 'c',
+    # Double lines
+    '╔': 'tl', '╗': 'tr', '╚': 'bl', '╝': 'br',
+    '╠': 'tr', '╣': 'lt', '╦': 'tb', '╩': 'lt',
+    '╬': 'c', '╱': 'd', '╲': 'd', '╳': 'c',
+    # Arrows
+    '▲': 'a', '▼': 'a', '◄': 'a', '►': 'a',
+    '↑': 'a', '↓': 'a', '←': 'a', '→': 'a',
+}
 
-    def __init__(self, lines, font_normal, font_symbol, font_size=9, cell_w=None, line_h=None, text_color=None):
+
+def _is_box_char(ch: str) -> bool:
+    """Check if character is a box-drawing character."""
+    return ch in _BOX_CHARS or (0x2500 <= ord(ch) <= 0x257F)
+
+
+class _FlowchartBlock(Flowable):
+    """Render text-art flowchart by first converting to an image using PIL.
+    
+    This uses PIL/Pillow to render the flowchart text with system monospace fonts,
+    ensuring perfect alignment. The rendered image is then embedded in the PDF.
+    """
+
+    def __init__(self, lines, font_name='NSimSun', font_size=14, 
+                 bg_color=(248, 250, 252), text_color=(55, 65, 81)):
         super().__init__()
         self._lines = lines
-        self._font_normal = font_normal
-        self._font_symbol = font_symbol
+        self._font_name = font_name
         self._font_size = font_size
-        # Use a uniform half-width cell; CJK chars occupy 2 cells.
-        self._cell_w = cell_w or font_size * 0.55
-        self._line_h = line_h or font_size * 1.35
-        self._text_color = text_color or colors.HexColor("#374151")
-
-        # Pre-compute dimensions
-        max_cols = 0
-        for ln in lines:
-            cols = sum(2 if self._is_wide(c) else 1 for c in ln)
-            if cols > max_cols:
-                max_cols = cols
-        self.width = max_cols * self._cell_w + 4  # small padding
-        self.height = len(lines) * self._line_h + 4
-
+        self._bg_color = bg_color
+        self._text_color = text_color
+        self._padding = 12
+        self._scale = 2  # Render at 2x scale for higher resolution
+        
+        # Try to import PIL
+        try:
+            from PIL import ImageFont
+            self._has_pil = True
+            # Use larger font for high-res rendering
+            scaled_font_size = font_size * self._scale
+            # Test font loading
+            try:
+                self._font = ImageFont.truetype(f"C:/Windows/Fonts/{font_name}.ttc", scaled_font_size)
+            except:
+                try:
+                    self._font = ImageFont.truetype(f"C:/Windows/Fonts/{font_name}.ttf", scaled_font_size)
+                except:
+                    # Fallback to simsun or default
+                    try:
+                        self._font = ImageFont.truetype("C:/Windows/Fonts/simsun.ttc", scaled_font_size)
+                    except:
+                        self._font = ImageFont.load_default()
+            
+            # Calculate dimensions by measuring text
+            self._cell_w, self._line_h = self._measure_font_metrics()
+            
+            # Calculate flowchart dimensions
+            max_chars = 0
+            for line in lines:
+                char_units = sum(2 if self._is_wide(c) else 1 for c in line)
+                max_chars = max(max_chars, char_units)
+            
+            # Image dimensions at scaled resolution
+            img_width = max_chars * self._cell_w + self._padding * 2 * self._scale
+            img_height = len(lines) * self._line_h + self._padding * 2 * self._scale
+            
+            # Display dimensions (scaled down for PDF)
+            self.width = img_width / self._scale
+            self.height = img_height / self._scale
+            self._img_width = img_width
+            self._img_height = img_height
+            
+        except ImportError:
+            self._has_pil = False
+            # Fallback dimensions
+            self._scale = 1
+            self._cell_w = font_size * 0.6
+            self._line_h = font_size * 1.2
+            max_chars = max(len(line) for line in lines) if lines else 0
+            self.width = max_chars * self._cell_w * 2 + self._padding * 2
+            self.height = len(lines) * self._line_h + self._padding * 2
+            self._img_width = self.width
+            self._img_height = self.height
+    
+    def _measure_font_metrics(self):
+        """Measure font character width and line height."""
+        from PIL import Image, ImageDraw
+        # Create a temporary image to measure text
+        temp_img = Image.new('RGB', (100, 100), (255, 255, 255))
+        temp_draw = ImageDraw.Draw(temp_img)
+        
+        # Measure a full-width character
+        bbox = temp_draw.textbbox((0, 0), '█', font=self._font)
+        full_width = bbox[2] - bbox[0]
+        full_height = bbox[3] - bbox[1]
+        
+        # Measure a half-width character
+        bbox_half = temp_draw.textbbox((0, 0), 'A', font=self._font)
+        half_width = bbox_half[2] - bbox_half[0]
+        
+        # Use half-width as the base cell unit
+        cell_w = half_width
+        # Line height with some spacing
+        line_h = int(full_height * 1.15)
+        
+        return cell_w, line_h
+    
     @staticmethod
     def _is_wide(ch):
-        """Return True for characters that should occupy 2 grid cells."""
+        """Check if character is full-width (CJK)."""
         ea = unicodedata.east_asian_width(ch)
         return ea in ('W', 'F')
-
+    
     def wrap(self, availWidth, availHeight):
         return min(self.width, availWidth), self.height
-
+    
     def draw(self):
-        c = self.canv
-        c.saveState()
-        c.setFillColor(self._text_color)
-        y = self.height - self._line_h  # start from top
-        for ln in self._lines:
-            x = 0.0
-            for ch in ln:
-                if ch == ' ':
-                    x += self._cell_w
-                    continue
-                is_sym = _is_symbol_char(ch)
-                font = self._font_symbol if is_sym else self._font_normal
-                c.setFont(font, self._font_size)
-                w = 2 * self._cell_w if self._is_wide(ch) else self._cell_w
-                # Centre the glyph within its cell(s)
-                glyph_w = c.stringWidth(ch, font, self._font_size)
-                c.drawString(x + (w - glyph_w) / 2, y, ch)
-                x += w
-            y -= self._line_h
-        c.restoreState()
+        """Draw the flowchart by rendering as image and embedding it."""
+        import tempfile
+        import os
+        
+        temp_path = None
+        try:
+            from PIL import Image, ImageDraw
+            
+            # Create image at scaled resolution for higher quality
+            img = Image.new('RGB', (int(self._img_width), int(self._img_height)), self._bg_color)
+            draw = ImageDraw.Draw(img)
+            
+            # Draw text line by line with scaled padding
+            scaled_padding = self._padding * self._scale
+            y = scaled_padding
+            for line in self._lines:
+                x = scaled_padding
+                for ch in line:
+                    draw.text((int(x), int(y)), ch, font=self._font, fill=self._text_color)
+                    if self._is_wide(ch):
+                        x += self._cell_w * 2
+                    else:
+                        x += self._cell_w
+                y += self._line_h
+            
+            # Save to temp file
+            temp_fd, temp_path = tempfile.mkstemp(suffix='.png')
+            os.close(temp_fd)
+            img.save(temp_path, format='PNG')
+            
+            # Draw image onto canvas (display at scaled-down size for sharp rendering)
+            self.canv.drawImage(temp_path, 0, 0, width=self.width, height=self.height)
+            
+        finally:
+            # Clean up temp file
+            if temp_path and os.path.exists(temp_path):
+                try:
+                    os.unlink(temp_path)
+                except:
+                    pass
 
 
 def _is_flowchart_line(line: str) -> bool:
@@ -384,8 +505,8 @@ def _render_markdown(story, markdown_text: str, h_style, h3_style, body_style, q
             story.append(Spacer(1, 4))
             block = _FlowchartBlock(
                 flowchart_buffer,
-                font_normal=font_normal,
-                font_symbol=font_symbol,
+                font_name='simsun',  # Use system monospace font
+                font_size=13,
             )
             story.append(block)
             story.append(Spacer(1, 4))
@@ -404,9 +525,15 @@ def _render_markdown(story, markdown_text: str, h_style, h3_style, body_style, q
             continue
 
         if in_code:
-            _flush_flowchart()
-            safe = _escape_html_preserve_space(line)
-            story.append(Paragraph(safe or "&nbsp;", code_style))
+            # Check if this is a flowchart line inside code block
+            if _is_flowchart_line(line):
+                flowchart_buffer.append(line)
+            else:
+                # Non-flowchart line in code block - flush flowchart and render as code
+                if flowchart_buffer:
+                    _flush_flowchart()
+                safe = _escape_html_preserve_space(line)
+                story.append(Paragraph(safe or "&nbsp;", code_style))
             i += 1
             continue
 
@@ -473,7 +600,34 @@ def _render_markdown(story, markdown_text: str, h_style, h3_style, body_style, q
             i += 1
             continue
 
-        # Regular paragraph
+        # Check for markdown image syntax: ![alt](path)
+        img_match = re.match(r'^!\[([^\]]*)\]\(([^)]+)\)$', stripped)
+        if img_match:
+            _flush_flowchart()
+            img_path = img_match.group(2)
+            if Path(img_path).exists():
+                try:
+                    from reportlab.platypus import Image as RLImage
+                    img = RLImage(img_path)
+                    # Scale to fit page width
+                    page_width = A4[0] - 36 * mm
+                    if img.drawWidth > page_width:
+                        ratio = page_width / img.drawWidth
+                        img.drawWidth = page_width
+                        img.drawHeight = img.drawHeight * ratio
+                    story.append(Spacer(1, 6))
+                    story.append(img)
+                    story.append(Spacer(1, 6))
+                except Exception as e:
+                    print(f"Warning: Could not insert image {img_path}: {e}")
+            else:
+                # Image path doesn't exist, show as text
+                story.append(Paragraph(_make_body(stripped), body_style))
+            i += 1
+            continue
+
+        # Regular paragraph (fallback for any other content)
+        _flush_flowchart()
         story.append(Paragraph(_make_body(stripped), body_style))
         i += 1
 

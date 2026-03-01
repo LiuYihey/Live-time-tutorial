@@ -3,10 +3,10 @@ name: rich-notebook-pdf-generator
 description: |
   Generate structured PDF study notes with rich formatting.
   Use when: user wants a detailed study note after a quiz or learning session.
-version: 3.0.0
+version: 3.1.0
 tags: [agent-skill, notebook, pdf, study-notes]
 created: 2026-02-23
-updated: 2026-02-24
+updated: 2026-03-02
 ---
 
 # Rich Notebook PDF Generator
@@ -98,7 +98,7 @@ Always include at least one comparison or summary table. Tables are the most eff
 
 ### 6. Process Flowchart
 
-When applicable, describe a decision or process flow using a text-based flowchart with box-drawing characters.
+When applicable, describe a decision or process flow using a text-based flowchart with box-drawing characters. Flowcharts are automatically rendered as high-resolution images for perfect alignment.
 
 ```
 ## 6. Process Flowchart
@@ -116,6 +116,8 @@ When applicable, describe a decision or process flow using a text-based flowchar
 └─────────────┘
 ```
 
+**Supported box-drawing characters**: `─ │ ┌ ┐ └ ┘ ├ ┤ ┬ ┴ ┼ ▼ ▲ ◄ ►` and all Unicode box-drawing range (U+2500-U+257F)
+
 ## Formatting Rules
 
 1. **Bold liberally**: Every key term, definition name, and important conclusion should be **bold**
@@ -124,7 +126,7 @@ When applicable, describe a decision or process flow using a text-based flowchar
 4. **No checkboxes**: Never use `[ ]` or `[x]` syntax
 5. **No bullet-only sections**: Main content should use numbered structure, not just `-` lists
 6. **Code blocks**: Use fenced code blocks with language tags for all code
-7. **Flowcharts**: Use box-drawing characters (─│┌┐└┘├┤▼►) for process flows
+7. **Flowcharts**: Use box-drawing characters (─│┌┐└┘├┤▼►) for process flows — auto-rendered as sharp images
 
 ## JSON Payload Format
 
@@ -157,14 +159,16 @@ When applicable, describe a decision or process flow using a text-based flowchar
 - Markdown rendering (headings, bold, lists, code blocks, quotes)
 - Screenshot as header image (from `screenshotPath`)
 - Markdown table detection and styled rendering
-- Box-drawing flowchart rendering
+- **Flowchart rendering**: Text-based flowcharts are automatically converted to high-resolution PNG images using PIL (2x scale for sharp display), then embedded in the PDF
+- Markdown image syntax support: `![alt](path)` for embedding images
 - Theme support (clean/warm/forest) with accent colors
 - Chinese font support (Microsoft YaHei, SimHei, SimSun)
 
-**Dependencies**: `reportlab` (`pip install reportlab`)
+**Dependencies**: `reportlab`, `Pillow` (`pip install reportlab Pillow`)
 
 ## Output
 
 - **Default save location**: `~/Desktop/Notebook/{topic}.pdf`
-- **JSON cleanup**: The result.json intermediate file is auto-deleted after PDF generation
+- **JSON cleanup**: The payload JSON file is auto-deleted after PDF generation
 - **Screenshot cleanup**: Screenshot file is auto-deleted after being embedded in PDF
+- **Flowchart images**: Rendered in-memory and embedded directly; no intermediate files left on disk
