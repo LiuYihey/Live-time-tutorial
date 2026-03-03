@@ -337,7 +337,7 @@ class _FlowchartBlock(Flowable):
         self._bg_color = bg_color
         self._text_color = text_color
         self._padding = 12
-        self._scale = 2  # Render at 2x scale for higher resolution
+        self._scale = 4  # Render at 4x scale for ultra-high resolution
         
         # Try to import PIL
         try:
