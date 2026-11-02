@@ -20,6 +20,10 @@
   <img src="GUI use case.png" alt="Live-time-tutorial quiz window running inside an IDE next to the agent chat" width="880">
 </p>
 
+<p align="center">
+  <em>Ask the agent to teach you a topic — the quiz window opens right beside the chat, without leaving the editor.</em>
+</p>
+
 ---
 
 ## 🧠 Highlights
@@ -39,17 +43,15 @@ Task Complete → AI Summarizes → Generate Quiz → User Answers in GUI
 
 ### 🎬 In Action
 
-Question and options on the left, instant explanation on the right, and a feedback box for follow-ups — all in one window:
+Inside the quiz window, the question and options sit on the left while the explanation appears on the right as soon as you answer:
 
 <p align="center">
   <img src="Example quiz.png" alt="Quiz window with question, options, and the instant-feedback explanation panel" width="90%">
 </p>
 
-1. **Ask the agent** — e.g. "teach me the two-sum algorithm"
-2. **Quiz pops up** — the agent calls `generate_quiz` and the window opens automatically
-3. **Answer to learn** — click an option and the explanation, terminology, and key points appear on the right
-4. **Follow up** — type a prompt in **Feedback to Agent** to get another quiz on the same topic
-5. **Save it** — click **Save to Notebook** and a rich PDF note lands in `~/Desktop/Notebook/`
+1. **Answer to learn** — click an option and the explanation, terminology, and key points appear on the right
+2. **Follow up** — type a prompt in **Feedback to Agent** at the bottom to get another quiz on the same topic
+3. **Save it** — click **Save to Notebook** and a rich PDF note lands in `~/Desktop/Notebook/`
 
 The saved PDF keeps the quiz screenshot as its header and expands it into a full study note:
 

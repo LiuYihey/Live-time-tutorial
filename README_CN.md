@@ -20,6 +20,10 @@
   <img src="GUI use case.png" alt="Live-time-tutorial 测验窗口与 IDE 中的 agent 对话并排显示" width="880">
 </p>
 
+<p align="center">
+  <em>让 agent 教你某个知识点——测验窗口直接在对话旁边弹出，全程不用离开编辑器。</em>
+</p>
+
 ---
 
 ## 🧠 特性
@@ -39,17 +43,15 @@
 
 ### 🎬 实际效果
 
-左侧是题目与选项，右侧是即时解析，底部还能追问——全部集中在一个窗口里：
+测验窗口内，左侧是题目与选项，点击作答后右侧立即给出解析：
 
 <p align="center">
   <img src="Example quiz.png" alt="测验窗口：左侧题目与选项，右侧即时解析" width="90%">
 </p>
 
-1. **向 agent 提问** — 例如「辅助我学习一下 leetcode 算法题」
-2. **测验自动弹出** — agent 调用 `generate_quiz`，窗口立即打开
-3. **作答即讲解** — 点击选项，右侧立刻显示解析、术语定义和知识点
-4. **追问继续** — 在 **Feedback to Agent** 中输入问题，获得同一主题的下一轮测验
-5. **一键保存** — 点击 **Save to Notebook**，精美 PDF 笔记生成到 `~/Desktop/Notebook/`
+1. **作答即讲解** - 点击选项，右侧立刻显示解析、术语定义和知识点
+2. **追问继续** - 在底部 **Feedback to Agent** 输入框输入问题，获得同一主题的下一轮测验
+3. **一键保存** - 点击 **Save to Notebook**，精美 PDF 笔记生成到 `~/Desktop/Notebook/`
 
 生成的 PDF 以测验截图作为页首，并在此基础上扩展为完整的学习笔记：
 
