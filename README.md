@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <img src="Example quiz.png" alt="Quiz GUI Screenshot" width="600">
+  <img src="Example quiz.png" alt="Quiz GUI Screenshot" width="880">
 </p>
 
 ---
