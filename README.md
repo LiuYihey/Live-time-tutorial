@@ -42,7 +42,7 @@ Task Complete → AI Summarizes → Generate Quiz → User Answers in GUI
 Question and options on the left, instant explanation on the right, and a feedback box for follow-ups — all in one window:
 
 <p align="center">
-  <img src="Example quiz.png" alt="Quiz window with question, options, and the instant-feedback explanation panel" width="80%">
+  <img src="Example quiz.png" alt="Quiz window with question, options, and the instant-feedback explanation panel" width="90%">
 </p>
 
 1. **Ask the agent** — e.g. "teach me the two-sum algorithm"
