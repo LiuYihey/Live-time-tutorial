@@ -42,7 +42,7 @@
 左侧是题目与选项，右侧是即时解析，底部还能追问——全部集中在一个窗口里：
 
 <p align="center">
-  <img src="Example quiz.png" alt="测验窗口：左侧题目与选项，右侧即时解析" width="880">
+  <img src="Example quiz.png" alt="测验窗口：左侧题目与选项，右侧即时解析" width="80%">
 </p>
 
 1. **向 agent 提问** — 例如「辅助我学习一下 leetcode 算法题」
