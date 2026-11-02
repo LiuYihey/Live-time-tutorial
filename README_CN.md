@@ -37,6 +37,20 @@
 → [如果点击了Save to Notebook] → PDF自动生成 → 保存到 ~/Desktop/Notebook/
 ```
 
+### 🎬 实际效果
+
+测验以原生窗口的形式直接出现在 IDE 的 agent 对话旁边，学习过程完全不需要离开编辑器：
+
+<p align="center">
+  <img src="GUI use case.png" alt="Live-time-tutorial 测验窗口与 IDE 中的 agent 对话并排显示" width="880">
+</p>
+
+1. **向 agent 提问** — 例如「辅助我学习一下 leetcode 算法题」
+2. **测验自动弹出** — agent 调用 `generate_quiz`，窗口立即打开
+3. **作答即讲解** — 点击选项，右侧立刻显示解析、术语定义和知识点
+4. **追问继续** — 在 **Feedback to Agent** 中输入问题，获得同一主题的下一轮测验
+5. **一键保存** — 点击 **Save to Notebook**，精美 PDF 笔记生成到 `~/Desktop/Notebook/`
+
 ## 🚀 部署安装
 
 ### 1. 构建服务

@@ -37,6 +37,20 @@ Task Complete → AI Summarizes → Generate Quiz → User Answers in GUI
 → [If Save to Notebook clicked] → PDF Auto-generated → Saved to ~/Desktop/Notebook/
 ```
 
+### 🎬 In Action
+
+The quiz opens as a native window right next to your agent chat, so learning never leaves your editor:
+
+<p align="center">
+  <img src="GUI use case.png" alt="Live-time-tutorial quiz window running inside an IDE next to the agent chat" width="880">
+</p>
+
+1. **Ask the agent** — e.g. "teach me the two-sum algorithm"
+2. **Quiz pops up** — the agent calls `generate_quiz` and the window opens automatically
+3. **Answer to learn** — click an option and the explanation, terminology, and key points appear on the right
+4. **Follow up** — type a prompt in **Feedback to Agent** to get another quiz on the same topic
+5. **Save it** — click **Save to Notebook** and a rich PDF note lands in `~/Desktop/Notebook/`
+
 ## 🚀 Installation
 
 ### 1. Build
